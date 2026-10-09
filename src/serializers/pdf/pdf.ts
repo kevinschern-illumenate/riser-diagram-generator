@@ -98,7 +98,7 @@ export async function serializePdf(
   document.setTitle(project.meta.name);
   document.setAuthor(project.meta.designer);
   document.setSubject(project.meta.number);
-  document.setCreator('ilLumenate Lighting Riser Generator v1.2.0');
+  document.setCreator('ilLumenate Lighting Riser Generator v1.3.0');
   document.setProducer('ilLumenate Lighting vector drawing model');
   const date = new Date(`${project.meta.date}T00:00:00Z`);
   document.setCreationDate(date);

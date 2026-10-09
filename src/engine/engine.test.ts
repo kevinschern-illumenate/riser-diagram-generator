@@ -150,6 +150,22 @@ describe('required engineering acceptance cases', () => {
     expect(low.messages.some((m) => m.code === 'PSU_OVERLOAD')).toBe(false);
     expect(high.messages.some((m) => m.code === 'PSU_OVERLOAD')).toBe(true);
   });
+  it('a catalog usable load factor tightens the operating target, never loosens it', () => {
+    const derated = (factor: number) => {
+      const libs = library();
+      const item = libs.products.find((p) => p.id === 'psu-24v-96w')!;
+      if (item.specs.kind !== 'psu') throw new Error('fixture');
+      item.specs.usableLoadFactor = factor;
+      return libs;
+    };
+    const warning = (libs: LibrarySnapshot) =>
+      calculate(single(70), libs).messages.find((m) => m.code === 'PSU_ABOVE_DERATE');
+    expect(warning(library())).toBeUndefined();
+    expect(warning(derated(0.7))?.text).toContain(
+      '70% usable load limit from the ilLumenate catalog',
+    );
+    expect(warning(derated(0.95))).toBeUndefined();
+  });
   it('12 supplies at 1.4 A require 21 A after continuous-load factor', () => {
     const p = single();
     p.equipment[0]!.qty = 12;

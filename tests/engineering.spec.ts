@@ -6,6 +6,9 @@ const seedProducts = JSON.parse(readFileSync('src/data/products.example.json', '
   string,
   unknown
 >[];
+const catalogPayload = JSON.parse(
+  readFileSync('src/features/erp/fixtures/catalog-payload.json', 'utf8'),
+) as Record<string, unknown>;
 function flatten(row: Record<string, unknown>, prefix = ''): Record<string, unknown> {
   return Object.assign(
     {},
@@ -76,9 +79,12 @@ test('full demo flows through review, worker drawing, pins and downloads', async
   expect(errors).toEqual([]);
 });
 
-test('validates a mapped 50-row CSV and commits the ERP demo with library undo', async ({
+test('validates a mapped 50-row CSV and applies the ilLumenate catalog with library undo', async ({
   page,
 }) => {
+  await page.route('**/api/erp/catalog', (route) =>
+    route.fulfill({ json: { ...catalogPayload, hash: 'a'.repeat(64) } }),
+  );
   await page.goto('/#/libraries');
   const example = seedProducts.find((p) => p.category === 'psu')!;
   const csv = exportCsv(
@@ -91,14 +97,16 @@ test('validates a mapped 50-row CSV and commits the ERP demo with library undo',
   await expect(page.locator('.import-summary')).toContainText('0 errors');
   await page.getByRole('button', { name: 'Commit import' }).click();
   await expect(page.getByText('50 rows imported.')).toBeVisible();
-  await page.getByRole('tab', { name: 'ERPNext Sync' }).click();
-  await page.getByRole('button', { name: 'Preview pull' }).click();
-  await expect(page.getByText(/3 added · 0 updated/)).toBeVisible();
-  await page.getByRole('button', { name: 'Commit valid pull' }).click();
-  await expect(page.getByText(/Pull committed/)).toBeVisible();
+  await page.getByRole('tab', { name: 'ilLumenate catalog' }).click();
+  await page.getByRole('button', { name: 'Load ilLumenate catalog' }).click();
+  await expect(page.getByText(/10 added · 0 updated/)).toBeVisible();
+  await page.getByRole('button', { name: 'Apply catalog' }).click();
+  await expect(page.getByText(/Catalog applied/)).toBeVisible();
+  await page.getByRole('button', { name: 'Load ilLumenate catalog' }).click();
+  await expect(page.getByText(/0 added · 0 updated · 10 unchanged/)).toBeVisible();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.getByRole('button', { name: 'Preview pull' }).click();
-  await expect(page.getByText(/3 added · 0 updated/)).toBeVisible();
+  await page.getByRole('button', { name: 'Load ilLumenate catalog' }).click();
+  await expect(page.getByText(/10 added · 0 updated/)).toBeVisible();
 });
 
 test('TSV paste is atomic, row edits undo, and metric lengths use canonical feet', async ({

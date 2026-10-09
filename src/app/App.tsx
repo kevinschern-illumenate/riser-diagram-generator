@@ -308,7 +308,7 @@ export function App() {
           <footer className="page-footer">
             <span>ilLumenate Lighting Riser Generator</span>
             <span>
-              LOCAL WORKSPACE <span className="footer-dot">·</span> v1.2.0
+              LOCAL WORKSPACE <span className="footer-dot">·</span> v1.3.0
             </span>
           </footer>
         </main>

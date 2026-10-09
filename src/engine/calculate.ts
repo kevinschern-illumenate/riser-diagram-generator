@@ -472,6 +472,11 @@ export function calculate(project: Project, library: LibrarySnapshot): EngineRes
             `${eq.tag}: ${round(total)} W exceeds ${spec.ratedW} W rated output.`,
           ),
         );
+      // The catalog's usable load factor tightens, never loosens, the project target.
+      const operatingTarget = Math.min(
+        project.settings.psuDeratePct,
+        (spec.usableLoadFactor ?? 1) * 100,
+      );
       for (const output of spec.outputs) {
         const connected = children(eq.id).filter(
           (e) => e.fromPort === output.name || (!e.fromPort && output === spec.outputs[0]),
@@ -515,13 +520,13 @@ export function calculate(project: Project, library: LibrarySnapshot): EngineRes
               `${eq.tag}/${output.name}: ${round(watts)} W exceeds ${output.maxW} W output limit.`,
             ),
           );
-        else if (percent > project.settings.psuDeratePct)
+        else if (percent > operatingTarget)
           messages.push(
             message(
               'PSU_ABOVE_DERATE',
               'warning',
               eq.id,
-              `${eq.tag}/${output.name}: ${round(percent, 1)}% exceeds the ${project.settings.psuDeratePct}% project operating target.`,
+              `${eq.tag}/${output.name}: ${round(percent, 1)}% exceeds the ${round(operatingTarget, 1)}% ${operatingTarget < project.settings.psuDeratePct ? 'usable load limit from the ilLumenate catalog' : 'project operating target'}.`,
             ),
           );
         if (output.class2 && watts > 100)

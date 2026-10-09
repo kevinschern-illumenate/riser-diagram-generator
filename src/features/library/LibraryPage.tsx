@@ -7,7 +7,7 @@ import { seedCodeTables, seedLayers, seedNotes, seedTitleBlocks } from '@/data/s
 import { CodeTableSchema, type CodeTable } from '@/schemas/reference-data';
 import { useLibraryStore } from '@/state/library-store';
 import { LibraryManager } from './LibraryManager';
-import { ErpPanel } from '../erp/ErpPanel';
+import { CatalogPanel } from '../erp/CatalogPanel';
 
 function JsonView({ value }: { value: unknown }) {
   return <pre className="data-json">{JSON.stringify(value, null, 2)}</pre>;
@@ -242,7 +242,7 @@ export function LibraryPage() {
             ['code', 'Code tables'],
             ['drawing', 'Drawing standards'],
             ['notes', 'General notes'],
-            ['erp', 'ERPNext Sync'],
+            ['erp', 'ilLumenate catalog'],
           ].map(([value, label]) => (
             <Tabs.Trigger key={value} value={value!}>
               {label}
@@ -341,7 +341,7 @@ export function LibraryPage() {
           </section>
         </Tabs.Content>
         <Tabs.Content value="erp">
-          <ErpPanel />
+          <CatalogPanel />
         </Tabs.Content>
       </Tabs.Root>
     </div>
