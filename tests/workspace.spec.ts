@@ -55,8 +55,8 @@ test('all implemented routes load and theme persists', async ({ page }) => {
   }
   await page.getByRole('link', { name: /Libraries/ }).click();
   await expect(page.getByRole('heading', { name: 'Product library' })).toBeVisible();
-  await page.getByRole('tab', { name: 'ERPNext Sync' }).click();
-  await expect(page.getByRole('button', { name: 'Preview pull' })).toBeVisible();
+  await page.getByRole('tab', { name: 'ilLumenate catalog' }).click();
+  await expect(page.getByRole('button', { name: 'Load ilLumenate catalog' })).toBeVisible();
   await page.getByRole('button', { name: 'Use dark mode' }).click();
   await expect(page.locator('html')).toHaveClass('dark');
   await page.reload();

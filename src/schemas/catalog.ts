@@ -30,6 +30,8 @@ const PowerShape = {
   outputVMin: PositiveSchema.optional(),
   outputVMax: PositiveSchema.optional(),
   ratedW: PositiveSchema,
+  // ERP derate: the share of ratedW the design may load (ilLumenate catalog).
+  usableLoadFactor: PositiveSchema.max(1).optional(),
   outputs: uniqueList(
     z.object({ name: IdSchema, maxW: PositiveSchema, class2: z.boolean() }).strict(),
     (v) => v.name,

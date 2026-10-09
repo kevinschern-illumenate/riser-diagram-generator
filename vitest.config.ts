@@ -11,7 +11,7 @@ export default defineConfig({
         'src/engine/**/*.ts',
         'src/drawing/**/*.ts',
         'src/serializers/**/*.ts',
-        'src/features/erp/sync.ts',
+        'src/features/erp/catalog.ts',
         'src/features/library/import.ts',
         'src/state/project-store.ts',
         'src/storage/**/*.ts',

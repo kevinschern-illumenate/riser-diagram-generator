@@ -3,15 +3,33 @@ import express from 'express';
 import { z } from 'zod';
 import { pathToFileURL } from 'node:url';
 
-const requestSchema = z
-  .object({
-    groups: z.array(z.string().trim().min(1).max(120)).min(1).max(20),
-    fields: z
-      .array(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]*$/))
-      .min(1)
-      .max(80),
-  })
-  .strict();
+// The System Designer's desktop catalog endpoint (staff API key with the engineering capability).
+export const CATALOG_METHOD =
+  'illumenate_lighting.illumenate_lighting.system_design.api.get_catalog_for_desktop';
+
+const envelopeSchema = z.object({
+  message: z.union([
+    z
+      .object({
+        success: z.literal(true),
+        data: z
+          .object({
+            hash: z.string().regex(/^[0-9a-f]{64}$/),
+            engine_contract_version: z.string(),
+            items: z.array(z.record(z.string(), z.unknown())),
+          })
+          .passthrough(),
+      })
+      .strict(),
+    z.object({ success: z.literal(false), code: z.string(), error: z.string() }).strict(),
+  ]),
+});
+
+const failures = {
+  FORBIDDEN: [403, 'The ERP API key needs an ilLumenate staff user with engineering access.'],
+  NOT_FOUND: [404, 'ilLumenate has not published a design catalog yet.'],
+};
+
 export function createProxy({ env = process.env, fetchImpl = fetch } = {}) {
   const app = express();
   app.disable('x-powered-by');
@@ -24,19 +42,13 @@ export function createProxy({ env = process.env, fetchImpl = fetch } = {}) {
     res.set('Cache-Control', 'no-store');
     next();
   });
-  app.use(express.json({ limit: '64kb' }));
+  const configured = () =>
+    !!(env.ERPNEXT_BASE_URL && env.ERPNEXT_API_KEY && env.ERPNEXT_API_SECRET);
   app.get('/api/erp/status', (_req, res) =>
-    res.json({
-      configured: !!(env.ERPNEXT_BASE_URL && env.ERPNEXT_API_KEY && env.ERPNEXT_API_SECRET),
-      direction: 'pull-only',
-    }),
+    res.json({ configured: configured(), direction: 'pull-only', source: 'ilLumenate catalog' }),
   );
-  app.post('/api/erp/items', async (req, res) => {
-    const input = requestSchema.safeParse(req.body);
-    if (!input.success)
-      return res.status(400).json({ error: 'Provide item groups and valid ERP field names.' });
-    if (!env.ERPNEXT_BASE_URL || !env.ERPNEXT_API_KEY || !env.ERPNEXT_API_SECRET)
-      return res.status(503).json({ error: 'Configure the local .env first.' });
+  app.get('/api/erp/catalog', async (_req, res) => {
+    if (!configured()) return res.status(503).json({ error: 'Configure the local .env first.' });
     try {
       const base = new URL(env.ERPNEXT_BASE_URL);
       if (
@@ -45,55 +57,35 @@ export function createProxy({ env = process.env, fetchImpl = fetch } = {}) {
       )
         throw new Error('Use HTTPS for remote ERPNext');
       if (base.username || base.password) throw new Error('Use token configuration');
-      const data = [];
-      const pageSize = 200;
-      for (let start = 0; start < 20000; start += pageSize) {
-        const url = new URL('/api/resource/Item', base);
-        url.searchParams.set(
-          'fields',
-          JSON.stringify([...new Set(['item_code', ...input.data.fields])]),
-        );
-        url.searchParams.set(
-          'filters',
-          JSON.stringify([
-            ['Item', 'item_group', 'in', input.data.groups],
-            ['Item', 'disabled', '=', 0],
-          ]),
-        );
-        url.searchParams.set('limit_start', String(start));
-        url.searchParams.set('limit_page_length', String(pageSize));
-        url.searchParams.set('order_by', 'name asc');
-        const upstream = await fetchImpl(url, {
-          headers: {
-            Authorization: `token ${env.ERPNEXT_API_KEY}:${env.ERPNEXT_API_SECRET}`,
-            Accept: 'application/json',
-          },
-          redirect: 'error',
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!upstream.ok) throw new Error('ERP request failed');
-        const page = z
-          .object({ data: z.array(z.record(z.string(), z.unknown())) })
-          .parse(await upstream.json()).data;
-        data.push(...page);
-        if (page.length < pageSize) return res.json({ data });
-      }
-      return res.status(422).json({ error: 'More than 20,000 items. Narrow the item groups.' });
+      const upstream = await fetchImpl(new URL(`/api/method/${CATALOG_METHOD}`, base), {
+        headers: {
+          Authorization: `token ${env.ERPNEXT_API_KEY}:${env.ERPNEXT_API_SECRET}`,
+          Accept: 'application/json',
+        },
+        redirect: 'error',
+        signal: AbortSignal.timeout(30000),
+      });
+      if (upstream.status === 401 || upstream.status === 403)
+        return res.status(403).json({ error: 'ERPNext rejected the API key.' });
+      if (!upstream.ok) throw new Error('ERP request failed');
+      const body = envelopeSchema.parse(await upstream.json()).message;
+      if (body.success) return res.json(body.data);
+      const [status, error] = failures[body.code] ?? [502, 'ERPNext could not build the catalog.'];
+      return res.status(status).json({ error });
     } catch {
       return res.status(502).json({
-        error:
-          'ERP pull failed. Check URL, token permissions, field mapping and item groups locally.',
+        error: 'Catalog load failed. Check the ERPNext URL and API key in the local .env.',
       });
     }
   });
   app.use((err, _req, res, _next) =>
-    res.status(err.status === 413 ? 413 : 400).json({ error: 'Invalid request body' }),
+    res.status(err.status === 413 ? 413 : 400).json({ error: 'Invalid request' }),
   );
   return app;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PROXY_PORT || 8787);
   createProxy().listen(port, '127.0.0.1', () =>
-    process.stdout.write(`ERPNext pull proxy listening on http://127.0.0.1:${port}\n`),
+    process.stdout.write(`ilLumenate catalog proxy listening on http://127.0.0.1:${port}\n`),
   );
 }

@@ -10,7 +10,7 @@ Save `.riser.json` from Project or Export for portable backup. Chromium uses a f
 
 ## Libraries
 
-Products and Wires support search, new/duplicate/edit/delete, CSV export and category templates. **New item** and **Edit selected** open a form with labeled fields, unit hints, protocol choices and repeatable rows for outputs, ports, channels and conductors. Sections follow the product category. New products start with blank ratings and can be saved incomplete. **Advanced JSON** remains available; changes carry across when switching between the two modes. Keep stable IDs on existing records. Manual edits mark changed fields as local ERP overrides; edit `localOverrides` in Advanced JSON to release protection intentionally.
+Products and Wires support search, new/duplicate/edit/delete, CSV export and category templates. **New item** and **Edit selected** open a form with labeled fields, unit hints, protocol choices and repeatable rows for outputs, ports, channels and conductors. Sections follow the product category. New products start with blank ratings and can be saved incomplete. **Advanced JSON** remains available; changes carry across when switching between the two modes. Keep stable IDs on existing records. Products loaded from the ilLumenate catalog are read-only; duplicate one to make an editable local variant.
 
 CSV flow: choose file → adjust automatic column mapping → inspect per-row errors and new/updated/unchanged counts → commit. Invalid batches cannot commit. Products match by SKU; wires by ID. Nested specs use dotted names; arrays are JSON strings. CSV exports escape spreadsheet formulas.
 
@@ -85,15 +85,15 @@ Equipment uses plain labeled blocks in aligned functional columns within enclosu
 
 Resolve engineering errors and verify the issue stamp before issuing drawings. Exports preserve the current design and stamp, including unresolved conditions.
 
-## ERPNext demo and later connection
+## The ilLumenate catalog
 
-Libraries → ERPNext Sync defaults to **Demo**. Preview three synthetic items, inspect counts/conflicts, commit and undo. Repeating the pull upserts by ERP item code. Protected local fields, including nested overrides, are preserved and reported.
+Libraries → **ilLumenate catalog** loads the catalog ilLumenate publishes for the System Designer.
 
-For a real endpoint later:
-
-1. Copy `.env.example` to `.env` locally and set URL/API key/secret. Never use front-end `VITE_*` credentials or project fields.
+1. Copy `.env.example` to `.env` locally and set the ERPNext URL and an API key/secret for an ilLumenate staff user with engineering access. Never use front-end `VITE_*` credentials or project fields.
 2. Run `npm run proxy` separately; it listens on loopback port 8787. Vite forwards `/api/erp` from development/preview.
-3. Choose the proxy source, item groups and actual JSON field mapping. The temporary map expects schema-valid specs JSON. Unfinished records must use the explicit incomplete specification structure; missing full-spec ratings are rejected.
-4. Preview, resolve invalid rows, then commit. Library changes after preview require a new preview.
+3. Choose **Load ilLumenate catalog**. The summary counts added, updated, unchanged, retired, conflicting and invalid products and lists the reasons.
+4. Choose **Apply catalog**. Undo restores the previous library. Library changes after loading require a new load.
 
-Transport performs Frappe Item GET requests in pages of 200, capped at 20,000 records, with timeouts and redacted failures. It never pushes data. Real ERP credentials and endpoint validation are intentionally deferred per Kevin's instruction.
+Catalog products replace their earlier copies whole and are read-only: Edit selected, grid edits and CSV imports refuse them. Duplicate one to make a local variant. A local product that already uses a catalog product's ID or SKU is never overwritten; rename or delete it, then load again. Products that leave the catalog stay in the library, read-only, so existing projects still open. A supply's usable-load factor from the catalog lowers the operating target used for warnings when it is stricter than the project target.
+
+The proxy makes one read-only request, with a timeout and redacted failures. It never writes to ERPNext. This is the last standalone release; new designs belong in the ilLumenate System Designer.

@@ -13,6 +13,12 @@ import { saveLibrary } from '../../storage/library';
 import { LibraryItemEditor } from './LibraryItemEditor';
 import { newLibraryItem } from './editor-model';
 import {
+  assertCatalogItemsUnchanged,
+  isCatalogItem,
+  localCopy,
+  READ_ONLY_MESSAGE,
+} from '../erp/catalog';
+import {
   autoMap,
   commitImport,
   exportCsv,
@@ -62,8 +68,8 @@ export function LibraryManager({ kind }: { kind: LibraryKind }) {
               valueGetter: (p) => (p.data && 'sku' in p.data ? p.data.sku : ''),
               minWidth: 180,
             },
-            { field: 'model', editable: true, minWidth: 220 },
-            { field: 'brand', editable: true },
+            { field: 'model', editable: (p) => !isCatalogItem(p.data), minWidth: 220 },
+            { field: 'brand', editable: (p) => !isCatalogItem(p.data) },
             { field: 'category' },
             {
               headerName: 'Specifications',
@@ -73,8 +79,12 @@ export function LibraryManager({ kind }: { kind: LibraryKind }) {
                   ? 'Needs specifications'
                   : 'Complete',
             },
+            {
+              headerName: 'Source',
+              valueGetter: (p) => (isCatalogItem(p.data) ? 'ilLumenate catalog' : 'Local'),
+            },
             { field: 'isExample', headerName: 'Example', cellDataType: 'boolean' },
-            { field: 'description', editable: true, minWidth: 250 },
+            { field: 'description', editable: (p) => !isCatalogItem(p.data), minWidth: 250 },
           ]
         : [
             { field: 'name', editable: true, minWidth: 240 },
@@ -86,9 +96,10 @@ export function LibraryManager({ kind }: { kind: LibraryKind }) {
     [kind],
   );
   function replace(next: LibraryRow[]) {
-    if (kind === 'products')
+    if (kind === 'products') {
+      assertCatalogItemsUnchanged(library.products, next as CatalogItem[]);
       useLibraryStore.getState().update('products', ProductLibrarySchema.parse(next));
-    else useLibraryStore.getState().update('wires', WireLibrarySchema.parse(next));
+    } else useLibraryStore.getState().update('wires', WireLibrarySchema.parse(next));
   }
   function edit(row: LibraryRow | undefined) {
     if (!row) return;
@@ -185,7 +196,8 @@ export function LibraryManager({ kind }: { kind: LibraryKind }) {
         </Button>
         <Button
           variant="outline"
-          disabled={selected.length !== 1 || !ready}
+          disabled={selected.length !== 1 || !ready || isCatalogItem(selected[0])}
+          title={isCatalogItem(selected[0]) ? READ_ONLY_MESSAGE : undefined}
           onClick={() => edit(rows.find((r) => r.id === selected[0]?.id))}
         >
           Edit selected
@@ -194,7 +206,8 @@ export function LibraryManager({ kind }: { kind: LibraryKind }) {
           variant="outline"
           disabled={selected.length !== 1 || !ready}
           onClick={() => {
-            const copy = structuredClone(selected[0]!);
+            const original = selected[0]!;
+            const copy = 'sku' in original ? localCopy(original) : structuredClone(original);
             const suffix = crypto.randomUUID().slice(0, 6);
             copy.id += `-${suffix}`;
             if ('sku' in copy) copy.sku += `-COPY-${suffix}`;
